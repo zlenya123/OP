@@ -1,1 +1,6 @@
-circle 1 2 3
+decommissioned	2004:06:20	Pancake	100
+decommissioned	2024:12:10	Cutlet	5000
+commissioned	2025:01:9	Soup	1000
+commissioned	2025:02:13	Pasta	3000
+decommissioned	2025:02:1	Pizza	2500
+decommissioned	2025:01:30	Cucumber	10000
