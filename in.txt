@@ -1,6 +1,6 @@
-commissioned	3	2004:06:20	Pancake	100	1200	50
+commissioned	3	2004:06:20	"Pancake"	100	120.5
 decommissioned	2024:12:10	1
-commissioned	1	2025:01:9	Soup	1000	125
-commissioned	2	2025:02:13	Pasta	3000	500
+commissioned	1	2025:01:9	"Soup"	1000	125
+commissioned	2	2025:02:13	"Pasta"	3000	500
 decommissioned	2025:02:1	2
 decommissioned	2025:01:30	3
