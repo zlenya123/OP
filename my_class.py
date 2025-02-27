@@ -37,29 +37,3 @@ class IncomingProduct(Product):
     def __str__(self):
         base_info = super().__str__()
         return f"{base_info}, Стоимость: {self.cost:.2f}, ID товара: {self.product_id}"
-
-
-def main():
-    file_path = 'in.csv'
-    written_off_products = []
-    incoming_products = []
-
-    with open(file_path, 'r', encoding='cp1251') as file:
-        for line in file:
-            product = Product.create_from_line(line)
-            if isinstance(product, WrittenOffProduct):
-                written_off_products.append(product)
-            elif isinstance(product, IncomingProduct):
-                incoming_products.append(product)
-
-    print("Списанные товары:")
-    for product in written_off_products:
-        print(product)
-
-    print("\nПоступившие товары:")
-    for product in incoming_products:
-        print(product)
-
-
-if __name__ == "__main__":
-    main()
