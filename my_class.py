@@ -198,6 +198,7 @@ class ProductApp(QtWidgets.QWidget):
             lines = read_file(file_path)
             self.products = create_products(lines)
             self.populate_table()
+    
 
     def populate_table(self):
         self.table.setRowCount(0)
@@ -222,6 +223,6 @@ class ProductApp(QtWidgets.QWidget):
 
     def delete_selected(self):
         selected_rows = set(index.row() for index in self.table.selectedIndexes())
-        for row in sorted(selected_rows, reverse=True):
+        for row in selected_rows:
             del self.products[row]
             self.table.removeRow(row)
