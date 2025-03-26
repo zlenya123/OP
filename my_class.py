@@ -1,23 +1,14 @@
 import datetime
+import logging
 from PyQt5 import QtWidgets
 
-def read_file(file_path):
-    with open(file_path, 'r', encoding='cp1251') as file:
-        return file.readlines()
+def generate_log_filename():
+    timestamp = datetime.datetime.now().strftime('%Y%m%d_%H%M%S')
+    return f'app_{timestamp}.log'
 
+log_filename = generate_log_filename()
 
-def create_products(lines):
-    products = []
-    for line in lines:
-        try:
-            product = Product.create_from_line(line)
-            if product:
-                products.append(product)
-        except (ValueError, IndexError) as e:
-            show_error(f"Ошибка обработки строки: {line.strip()}\nОшибка: {e}")
-    return products
-
-
+logging.basicConfig(level=logging.ERROR, filename=log_filename, filemode='w', format='%(asctime)s - %(levelname)s - %(message)s')
 
 def show_error(message):
     error_dialog = QtWidgets.QMessageBox()
@@ -25,14 +16,6 @@ def show_error(message):
     error_dialog.setWindowTitle('Ошибка')
     error_dialog.setText(message)
     error_dialog.exec_()
-
-
-def validate_date(date_str):
-    try:
-        datetime.datetime.strptime(date_str, '%d.%m.%Y')
-        return True
-    except ValueError:
-        return False
 
 class Product:
     def __init__(self, status, date, name, quantity):
@@ -42,39 +25,27 @@ class Product:
         self.quantity = int(quantity)
 
     def __str__(self):
-        return f"{self.status.capitalize()} товар: {self.name}, Дата: {self.date}, Количество: {self.quantity}"
+        return f"{self.status} товар: {self.name}, Дата: {self.date}, Количество: {self.quantity}"
 
     @staticmethod
     def create_from_line(line):
         data = line.strip().split(";")
         if len(data) < 6:
             raise ValueError("Недостаточно данных в строке.")
+        
+        status, date, name, quantity, extra, product_id = data
 
-        status = data[0]
-        date = data[1]
-        if not validate_date(date):
+        try:
+            datetime.datetime.strptime(date, '%d.%m.%Y')
+        except ValueError:
             raise ValueError(f"Некорректная дата: {date}")
 
         if status == "Списанный товар":
-            _, date, name, quantity, reason, product_id = data
-            if not quantity.isdigit() or not product_id.isdigit():
-                raise ValueError("Количество и ID должны быть числами.")
-            return WrittenOffProduct(date, name, quantity, reason, product_id)
-
+            return WrittenOffProduct(date, name, quantity, extra, product_id)
         elif status == "Поступивший товар":
-            _, date, name, quantity, cost, product_id = data
-            try:
-                float(cost)
-            except ValueError:
-                raise ValueError("Стоимость должна быть числом.")
-            if not quantity.isdigit() or not product_id.isdigit():
-                raise ValueError("Количество и ID должны быть числами.")
-            return IncomingProduct(date, name, quantity, cost, product_id)
-
+            return IncomingProduct(date, name, quantity, extra, product_id)
         else:
             raise ValueError(f"Неизвестный статус товара: {status}")
-
-
 
 class WrittenOffProduct(Product):
     def __init__(self, date, name, quantity, reason, product_id):
@@ -82,29 +53,41 @@ class WrittenOffProduct(Product):
         self.reason = reason
         self.product_id = int(product_id)
 
-    def __str__(self):
-        base_info = super().__str__()
-        return f"{base_info}, Причина списания: {self.reason}, ID товара: {self.product_id}"
-
-
 class IncomingProduct(Product):
     def __init__(self, date, name, quantity, cost, product_id):
         super().__init__("Поступивший товар", date, name, quantity)
         self.cost = float(cost)
         self.product_id = int(product_id)
 
-    def __str__(self):
-        base_info = super().__str__()
-        return f"{base_info}, Стоимость: {self.cost:.2f}, ID товара: {self.product_id}"
+class ProductManager:
+    @staticmethod
+    def read_file(file_path):
+        try:
+            with open(file_path, 'r') as file:
+                return file.readlines()
+        except FileNotFoundError:
+            raise FileNotFoundError(f"Файл не найден: {file_path}")
+
+    @staticmethod
+    def create_products(lines):
+        products = []
+        for line in lines:
+            try:
+                product = Product.create_from_line(line)
+                products.append(product)
+            except ValueError as e:
+                logging.error(f"Ошибка обработки строки: {line.strip()}\nОшибка: {e}")
+                show_error(f"Ошибка обработки строки: {line.strip()}\nОшибка: {e}")
+        return products
 
 class AddProductDialog(QtWidgets.QDialog):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle('Добавить товар')
-        self.setGeometry(200, 200, 400, 300)
         self.init_ui()
 
     def init_ui(self):
+        self.setWindowTitle('Добавить товар')
+        self.setGeometry(200, 200, 400, 300)
         layout = QtWidgets.QFormLayout()
 
         self.date_edit = QtWidgets.QLineEdit(datetime.datetime.now().strftime('%d.%m.%Y'))
@@ -134,7 +117,9 @@ class AddProductDialog(QtWidgets.QDialog):
 
     def validate_and_accept(self):
         date = self.date_edit.text()
-        if not validate_date(date):
+        try:
+            datetime.datetime.strptime(date, '%d.%m.%Y')
+        except:
             show_error('Некорректный формат даты. Используйте дд.мм.гггг.')
             return
         self.accept()
@@ -153,9 +138,62 @@ class AddProductDialog(QtWidgets.QDialog):
                 return IncomingProduct(date, name, quantity, cost, product_id)
             except ValueError:
                 show_error('Стоимость должна быть числом.')
+                return
         else:
             return WrittenOffProduct(date, name, quantity, extra, product_id)
 
+class TableManager:
+    def __init__(self, table_widget):
+        self.table_widget = table_widget
+        self.table_widget.setColumnCount(6)
+        self.table_widget.setHorizontalHeaderLabels(['Статус', 'Дата', 'Наименование', 'Количество', 'Дополнительно', 'ID'])
+
+    def populate_table(self, products):
+        self.table_widget.setRowCount(0)
+        for product in products:
+            row_position = self.table_widget.rowCount()
+            self.table_widget.insertRow(row_position)
+            self.table_widget.setItem(row_position, 0, QtWidgets.QTableWidgetItem(product.status))
+            self.table_widget.setItem(row_position, 1, QtWidgets.QTableWidgetItem(product.date))
+            self.table_widget.setItem(row_position, 2, QtWidgets.QTableWidgetItem(product.name))
+            self.table_widget.setItem(row_position, 3, QtWidgets.QTableWidgetItem(str(product.quantity)))
+            extra_info = str(getattr(product, 'reason', getattr(product, 'cost', '')))
+            self.table_widget.setItem(row_position, 4, QtWidgets.QTableWidgetItem(extra_info))
+            self.table_widget.setItem(row_position, 5, QtWidgets.QTableWidgetItem(str(product.product_id)))
+
+    def remove_row(self, row):
+        self.table_widget.removeRow(row)
+
+class FileLoader:
+    def __init__(self, product_manager):
+        self.product_manager = product_manager
+
+    def load_file(self, file_path):
+        lines = self.product_manager.read_file(file_path)
+        return self.product_manager.create_products(lines)
+
+class ProductController:
+    def __init__(self, products, table_manager, file_loader):
+        self.products = products
+        self.table_manager = table_manager
+        self.file_loader = file_loader
+
+    def add_product(self, product):
+        if product:
+            self.products.append(product)
+            self.table_manager.populate_table(self.products)
+
+    def delete_selected(self, selected_rows):
+        for row in sorted(selected_rows, reverse=True):
+            del self.products[row]
+            self.table_manager.remove_row(row)
+
+    def load_products_from_file(self, file_path):
+        try:
+            self.products = self.file_loader.load_file(file_path)
+            self.table_manager.populate_table(self.products)
+        except Exception as e:
+            show_error(f"Ошибка загрузки файла: {e}")
 
 class ProductApp(QtWidgets.QWidget):
     def __init__(self):
@@ -168,15 +206,12 @@ class ProductApp(QtWidgets.QWidget):
         self.setGeometry(100, 100, 700, 400)
 
         layout = QtWidgets.QVBoxLayout()
-
         self.table = QtWidgets.QTableWidget()
-        self.table.setColumnCount(6)
-        self.table.setHorizontalHeaderLabels(['Статус', 'Дата', 'Наименование', 'Количество', 'Дополнительно', 'ID'])
-        self.table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectRows)
+        self.table_manager = TableManager(self.table)
         layout.addWidget(self.table)
 
         button_layout = QtWidgets.QHBoxLayout()
-        
+
         self.load_button = QtWidgets.QPushButton('Загрузить файл')
         self.load_button.clicked.connect(self.select_file)
         button_layout.addWidget(self.load_button)
@@ -192,37 +227,21 @@ class ProductApp(QtWidgets.QWidget):
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
+        self.product_manager = ProductManager()
+        self.file_loader = FileLoader(self.product_manager)
+        self.product_controller = ProductController(self.products, self.table_manager, self.file_loader)
+
     def select_file(self):
         file_path, _ = QtWidgets.QFileDialog.getOpenFileName(self, 'Открыть файл', '', 'CSV файлы (*.csv);;Все файлы (*)')
         if file_path:
-            lines = read_file(file_path)
-            self.products = create_products(lines)
-            self.populate_table()
-    
-
-    def populate_table(self):
-        self.table.setRowCount(0)
-        for product in self.products:
-            row_position = self.table.rowCount()
-            self.table.insertRow(row_position)
-            self.table.setItem(row_position, 0, QtWidgets.QTableWidgetItem(product.status))
-            self.table.setItem(row_position, 1, QtWidgets.QTableWidgetItem(product.date))
-            self.table.setItem(row_position, 2, QtWidgets.QTableWidgetItem(product.name))
-            self.table.setItem(row_position, 3, QtWidgets.QTableWidgetItem(str(product.quantity)))
-            extra_info = str(getattr(product, 'reason', getattr(product, 'cost', '')))
-            self.table.setItem(row_position, 4, QtWidgets.QTableWidgetItem(extra_info))
-            self.table.setItem(row_position, 5, QtWidgets.QTableWidgetItem(str(product.product_id)))
+            self.product_controller.load_products_from_file(file_path)
 
     def add_product(self):
         dialog = AddProductDialog()
         if dialog.exec_() == QtWidgets.QDialog.Accepted:
             product = dialog.get_product_data()
-            if product:
-                self.products.append(product)
-                self.populate_table()
+            self.product_controller.add_product(product)
 
     def delete_selected(self):
         selected_rows = set(index.row() for index in self.table.selectedIndexes())
-        for row in selected_rows:
-            del self.products[row]
-            self.table.removeRow(row)
+        self.product_controller.delete_selected(selected_rows)
