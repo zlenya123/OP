@@ -1,4 +1,3 @@
-from my_class import show_error, logging
 import datetime
 
 class Product:
@@ -66,8 +65,7 @@ class ProductManager:
                 product = Product.create_from_line(line)
                 products.append(product)
             except ValueError as e:
-                logging.error(f"Ошибка обработки строки: {line.strip()}\nОшибка: {e}")
-                show_error(f"Ошибка обработки строки: {line.strip()}\nОшибка: {e}")
+                ValueError(f"Ошибка обработки строки: {line.strip()}\nОшибка: {e}")
         return products
     
     @staticmethod
