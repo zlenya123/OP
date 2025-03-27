@@ -55,11 +55,11 @@ class TestProduct(unittest.TestCase):
     def test_create_products_invalid(self):
         lines = [
             "Списанный товар;01.01.2023;Товар A;10;Причина;123",
-            "Новый товар;02.02.2023;Товар B;20;100.50;456",  # Неверный статус
-            "Списанный товар;32.01.2023;Товар C;15;Причина;789"  # Неверная дата
+            "Новый товар;02.02.2023;Товар B;20;100.50;456",
+            "Списанный товар;32.01.2023;Товар C;15;Причина;789" 
         ]
         products = ProductManager.create_products(lines)
-        self.assertEqual(len(products), 1)  # Только первый продукт будет добавлен
+        self.assertEqual(len(products), 1) 
 
 if __name__ == '__main__':
     unittest.main()
